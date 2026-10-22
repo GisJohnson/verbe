@@ -1,0 +1,859 @@
+<title>Verbe Prompteur</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout : colonne unique type carnet de répétition ; le prompteur s'ouvre en plateau sombre plein écran (toujours sombre, comme un vrai plateau). */
+:root{
+  --bg:#EDEFF3; --surface:#FFFFFF; --ink:#151924; --muted:#586073; --line:#D3D8E2;
+  --accent:#C9711C; --accent-soft:#F6E3CF; --onair:#CC3B32; --ok:#23835A; --warn:#B07A0C;
+  --stage:#0A0C11; --stage-ink:#F3F4F7; --stage-dim:#4E5466; --stage-line:#20242F; --stage-cue:#F2A54B; --stage-miss:#FF7A6E;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r:10px; --pfs:34px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F121A; --surface:#171B25; --ink:#E7E9EF; --muted:#9AA1B2; --line:#2A303E;
+  --accent:#EE9F48; --accent-soft:#3A2A19; --onair:#EE6359; --ok:#5BC08C; --warn:#E3B04A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F121A; --surface:#171B25; --ink:#E7E9EF; --muted:#9AA1B2; --line:#2A303E;
+  --accent:#EE9F48; --accent-soft:#3A2A19; --onair:#EE6359; --ok:#5BC08C; --warn:#E3B04A; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5}
+.wrap{max-width:640px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+.brand{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand h1{font-size:44px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.brand h1 span{color:var(--accent)}
+.brand p{margin:4px 0 0;color:var(--muted)}
+.streak{font-family:var(--f-mono);font-size:13px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--muted);white-space:nowrap}
+.streak b{color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.label{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+.chip{font-family:var(--f-mono);font-size:15px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer;font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.chip:focus-visible,.btn:focus-visible,textarea:focus-visible,input:focus-visible,.w:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.btn{font-family:var(--f-body);font-weight:700;font-size:15px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 14px;cursor:pointer}
+.btn.primary{background:var(--onair);border-color:var(--onair);color:#fff;font-size:18px;padding:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:10px}
+.btn.primary .dot{width:10px;height:10px;border-radius:50%;background:#fff}
+.btn.ghost{background:transparent}
+.big{font-family:var(--f-mono);font-size:28px;font-weight:600;font-variant-numeric:tabular-nums}
+.big small{font-size:14px;color:var(--muted);font-weight:500}
+textarea{width:100%;min-height:220px;resize:vertical;font-family:var(--f-body);font-size:16px;line-height:1.55;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px}
+.meter{position:relative;height:10px;border-radius:5px;background:var(--bg);border:1px solid var(--line);overflow:hidden}
+.meter i{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:5px;transition:width .25s}
+.meter b{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink)}
+.status{font-size:14px;font-weight:700}
+.st-ok{color:var(--ok)} .st-warn{color:var(--warn)} .st-bad{color:var(--onair)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.phases{display:flex;height:34px;border-radius:6px;overflow:hidden;font-size:12px;font-weight:700}
+.phases div{display:flex;align-items:center;justify-content:center;color:var(--ink);min-width:0;white-space:nowrap;overflow:hidden;padding:0 4px}
+.ph-hook{background:var(--accent);color:#fff!important}
+.ph-body{background:var(--accent-soft)}
+.ph-out{background:var(--ink);color:var(--surface)!important}
+.phase-times{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--ink);padding:9px 12px;font-family:var(--f-body);font-size:14px;font-weight:700;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.calib{border-top:1px dashed var(--line);padding-top:12px;display:flex;flex-direction:column;gap:10px}
+.calib blockquote{margin:0;font-size:17px;line-height:1.6;border-left:3px solid var(--accent);padding-left:12px}
+.words{display:flex;flex-wrap:wrap;gap:6px}
+.wchip{font-size:14px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:transparent;color:var(--ink);cursor:pointer}
+.wchip em{font-style:normal;color:var(--muted);font-family:var(--f-mono);font-size:12px;margin-left:4px}
+.hist{display:flex;flex-direction:column;gap:0;margin:0;padding:0;list-style:none}
+.hist li{display:grid;grid-template-columns:1fr auto auto;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.hist li:first-child{border-top:0}
+.note{font-size:13px;color:var(--muted)}
+
+/* Plateau */
+.stage{position:fixed;inset:0;background:var(--stage);color:var(--stage-ink);z-index:20;display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.sbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px max(14px, env(safe-area-inset-right,0px)) 8px max(14px, env(safe-area-inset-left,0px));flex-wrap:wrap}
+.tc{font-family:var(--f-mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:10px}
+.tc .rec{width:10px;height:10px;border-radius:50%;background:var(--stage-miss)}
+.tc.over{color:var(--stage-miss)}
+.phase-l{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--stage-cue);font-weight:700}
+.sbtns{display:flex;gap:6px}
+.sbtn{background:var(--stage-line);color:var(--stage-ink);border:0;border-radius:8px;padding:8px 11px;font-family:var(--f-body);font-weight:700;font-size:14px;cursor:pointer}
+.sbtn.stop{background:var(--stage-miss);color:var(--stage)}
+.sbtn:focus-visible{outline:3px solid var(--stage-cue);outline-offset:2px}
+.sprog{position:relative;height:6px;margin:0 max(14px, env(safe-area-inset-right,0px)) 0 max(14px, env(safe-area-inset-left,0px));background:var(--stage-line);border-radius:3px;overflow:hidden}
+.sprog i{position:absolute;inset:0 auto 0 0;background:var(--stage-cue)}
+.sprog b{position:absolute;top:0;bottom:0;width:2px;background:var(--stage)}
+.scroller{flex:1;overflow-y:auto;position:relative;padding:30vh max(20px, env(safe-area-inset-right,0px)) 60vh max(20px, env(safe-area-inset-left,0px));scroll-behavior:smooth}
+.scroller::before{content:"";position:fixed;left:0;right:0;top:38%;height:2px;background:linear-gradient(90deg,var(--stage-cue) 0 18px,transparent 18px);pointer-events:none;opacity:.8}
+.ptext{font-size:var(--pfs);line-height:1.45;font-weight:700;max-width:30ch;margin:0 auto;word-wrap:break-word}
+.ptext.mirror{transform:scaleX(-1)}
+.w{color:var(--stage-ink);transition:color .2s;border-radius:4px;cursor:pointer}
+.w.passed{color:var(--stage-dim)}
+.w.said{color:var(--stage-dim)}
+.w.skip{color:var(--stage-dim);text-decoration:underline wavy var(--stage-miss) 2px;text-underline-offset:6px}
+.w.cur{color:var(--stage-cue);box-shadow:0 3px 0 var(--stage-cue)}
+.banner{margin:8px max(14px, env(safe-area-inset-right,0px)) 0 max(14px, env(safe-area-inset-left,0px));background:var(--stage-line);border-left:3px solid var(--stage-miss);padding:10px 12px;font-size:14px;border-radius:6px}
+.heard{min-height:22px;padding:6px max(14px, env(safe-area-inset-right,0px)) 10px max(14px, env(safe-area-inset-left,0px));font-family:var(--f-mono);font-size:13px;color:var(--stage-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--f-display);font-size:30vmin;font-weight:800;color:var(--stage-cue);background:var(--stage);z-index:3}
+
+/* Bilan */
+.score{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.score .n{font-family:var(--f-display);font-size:72px;font-weight:800;line-height:1;letter-spacing:-.03em}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.stat{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat .v{font-family:var(--f-mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat .k{font-size:13px;color:var(--muted)}
+.fb{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.fb li{display:grid;grid-template-columns:96px 1fr;gap:10px;font-size:15px}
+.fb li span:first-child{font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;padding-top:2px}
+.fb .f-ok{color:var(--ok)} .fb .f-bad{color:var(--onair)} .fb .f-ex{color:var(--accent)}
+.lvl-name{font-size:24px;font-weight:700}
+.lvl-name span{color:var(--accent)}
+select.btn{font-weight:700;appearance:auto}
+.dots{display:flex;gap:6px}
+.dots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--accent)}
+.dots i.on{background:var(--accent)}
+.ladder{display:flex;gap:4px}
+.ladder span{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.ladder span.on{background:var(--accent)}
+.daily{border-top:1px dashed var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.daily h3{font-size:18px;font-weight:700}
+details summary{cursor:pointer;font-weight:700}
+details p{font-size:14px;color:var(--muted)}
+@media (max-width:420px){ .brand h1{font-size:38px} :root{--pfs:30px} .fb li{grid-template-columns:1fr;gap:2px} }
+@media (prefers-reduced-motion: reduce){ .scroller{scroll-behavior:auto} .w,.meter i{transition:none} }
+</style>
+
+<main class="wrap" id="vSetup">
+  <div class="brand">
+    <div>
+      <h1>Verbe<span>.</span></h1>
+      <p>Prompteur d'éloquence en français, calibré à la seconde.</p>
+    </div>
+    <div class="streak" id="streak">Série : <b>0</b> jour</div>
+  </div>
+
+  <section class="card" aria-labelledby="lLvl">
+    <div class="row between">
+      <div>
+        <div class="label" id="lLvl">Ton niveau</div>
+        <h2 class="lvl-name" id="lvlName">Niveau 1 · Fluidité</h2>
+      </div>
+      <select class="btn" id="lvlSel" aria-label="Choisir un niveau"></select>
+    </div>
+    <div class="ladder" id="ladder" aria-hidden="true"></div>
+    <p class="note" id="lvlFocus" style="margin:0"></p>
+    <div class="row"><div class="dots" id="lvlDots" aria-hidden="true"></div><span class="note" id="lvlProg"></span></div>
+    <div class="daily">
+      <div class="label">Script du jour</div>
+      <h3 id="dailyTitle" hidden></h3>
+      <div class="note" id="dailyInfo">Recherche du script du jour…</div>
+      <div class="row">
+        <button class="btn" id="dailyLoad" type="button" hidden>Charger ce script</button>
+        <button class="btn" id="dailyGen" type="button" hidden>Générer avec Claude</button>
+        <button class="btn ghost" id="dailyStop" type="button" hidden>Arrêter</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="lDur">
+    <div class="label" id="lDur">Durée de la prise</div>
+    <div class="row" id="durChips"></div>
+    <div id="libreBox" hidden>
+      <input type="range" id="durRange" min="60" max="600" step="15" value="60" aria-label="Durée libre en secondes">
+      <div class="note">Durée libre : <span class="mono" id="durRangeVal">1:00</span> (minimum 1:00)</div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="lDeb">
+    <div class="row between">
+      <div>
+        <div class="label" id="lDeb">Ton débit</div>
+        <div class="big"><span id="wpmVal">150</span> <small>mots/min</small></div>
+      </div>
+      <button class="btn" id="calibToggle" type="button">Calibrer mon débit</button>
+    </div>
+    <div class="calib" id="calibBox" hidden>
+      <div class="note">Lis ce texte à voix haute, à ton rythme naturel de vidéo. Touche « Démarrer » au premier mot, « Terminé » au dernier.</div>
+      <blockquote id="calibText"></blockquote>
+      <div class="row">
+        <button class="btn" id="calibGo" type="button">Démarrer</button>
+        <span class="mono muted" id="calibClock">0,0 s</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="lScr">
+    <div class="row between">
+      <div class="label" id="lScr">Script</div>
+      <div class="row">
+        <button class="btn ghost" id="listen" type="button">Écouter le modèle</button>
+        <button class="btn ghost" id="sample" type="button">Exemple</button>
+      </div>
+    </div>
+    <textarea id="script" aria-label="Texte du script" spellcheck="true"></textarea>
+    <div class="row between">
+      <span class="mono" id="meterTxt">0 / 150 mots</span>
+      <span class="mono muted" id="estTxt">≈ 0:00</span>
+    </div>
+    <div class="meter" aria-hidden="true"><i id="meterFill"></i><b id="meterMark"></b></div>
+    <div class="status" id="status"></div>
+  </section>
+
+  <section class="card" aria-labelledby="lPh">
+    <div class="label" id="lPh">Structure de la prise</div>
+    <div class="phases" id="phases">
+      <div class="ph-hook" id="phHook">Accroche</div>
+      <div class="ph-body" id="phBody">Développement</div>
+      <div class="ph-out" id="phOut">Chute</div>
+    </div>
+    <div class="phase-times" id="phTimes"></div>
+    <div class="note">Accroche dans les 5 premiers % du temps, chute et appel à l'action dans les 15 derniers %. Le plateau affiche la phase en cours.</div>
+  </section>
+
+  <section class="card" aria-labelledby="lMode">
+    <div class="label" id="lMode">Défilement</div>
+    <div class="seg" role="group" aria-label="Mode de défilement">
+      <button type="button" id="mVoice" aria-pressed="true">Suivi vocal</button>
+      <button type="button" id="mConst" aria-pressed="false">Vitesse constante</button>
+    </div>
+    <div class="note" id="modeNote">Le texte avance quand tu prononces les mots. Les mots non reconnus sont soulignés et comptés.</div>
+  </section>
+
+  <section class="card" id="reworkCard" hidden aria-labelledby="lRw">
+    <div class="label" id="lRw">Mots à retravailler</div>
+    <div class="words" id="rework"></div>
+    <div class="note">Touche un mot pour l'écouter, puis répète-le juste après (shadowing). Il disparaît quand tu le réussis en prise.</div>
+  </section>
+
+  <button class="btn primary" id="go" type="button"><span class="dot"></span>Lancer la prise</button>
+
+  <section class="card" id="histCard" hidden aria-labelledby="lHist">
+    <div class="label" id="lHist">Dernières prises</div>
+    <ul class="hist" id="hist"></ul>
+  </section>
+</main>
+
+<div class="stage" id="vStage" hidden>
+  <div class="sbar">
+    <div>
+      <div class="tc" id="tc"><span class="rec"></span><span id="tcTxt">00:00 / 01:00</span></div>
+      <div class="phase-l" id="phaseL">Accroche</div>
+    </div>
+    <div class="sbtns">
+      <button class="sbtn" id="fMinus" type="button" aria-label="Réduire le texte">A−</button>
+      <button class="sbtn" id="fPlus" type="button" aria-label="Agrandir le texte">A+</button>
+      <button class="sbtn" id="mirror" type="button">Miroir</button>
+      <button class="sbtn stop" id="stop" type="button">Stop</button>
+    </div>
+  </div>
+  <div class="sprog"><i id="sFill"></i><b id="sHook"></b><b id="sOut"></b></div>
+  <div class="banner" id="banner" hidden></div>
+  <div class="scroller" id="scroller"><div class="ptext" id="ptext"></div></div>
+  <div class="heard" id="heard" aria-live="off"></div>
+  <div class="count" id="count" hidden>3</div>
+</div>
+
+<main class="wrap" id="vReport" hidden>
+  <div class="brand"><h1>Bilan<span>.</span></h1></div>
+  <section class="card">
+    <div class="score"><span class="n" id="rScore">–</span><span class="muted" id="rScoreL">mots reconnus</span></div>
+    <div class="grid">
+      <div class="stat"><span class="v" id="rTime">–</span><span class="k" id="rTimeK">durée réelle</span></div>
+      <div class="stat"><span class="v" id="rWpm">–</span><span class="k">débit réel (mots/min)</span></div>
+      <div class="stat"><span class="v" id="rSkip">–</span><span class="k">mots manqués</span></div>
+      <div class="stat"><span class="v" id="rPar">–</span><span class="k">mots parasites</span></div>
+    </div>
+  </section>
+  <section class="card">
+    <div class="label">Retour du coach</div>
+    <ul class="fb" id="fb"></ul>
+  </section>
+  <section class="card" id="rMissCard">
+    <div class="label">Mots manqués</div>
+    <div class="words" id="rMiss"></div>
+  </section>
+  <section class="card">
+    <details><summary>Ce que le micro a entendu</summary><p id="rTrans"></p></details>
+    <div class="note">La reconnaissance vocale n'est pas une analyse phonétique : un mot manqué peut venir du bruit, d'un nombre écrit en chiffres ou de ton accent. Lis le score comme un indicateur.</div>
+  </section>
+  <div class="row">
+    <button class="btn primary" id="again" type="button" style="flex:1"><span class="dot"></span>Refaire la prise</button>
+  </div>
+  <button class="btn" id="back" type="button">Modifier le script</button>
+</main>
+
+<script>
+(function(){
+const $ = s => document.querySelector(s);
+const store = {
+  get(k,d){ try{ const v = localStorage.getItem('verbe.'+k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem('verbe.'+k, JSON.stringify(v)); }catch(e){} }
+};
+
+const SAMPLE = "Saviez-vous que Madagascar abrite six des huit espèces de baobabs connues au monde ? Ici, le baobab de Grandidier porte un nom malgache : renala, la mère de la forêt.\n\nSon secret tient dans son tronc. Comme une éponge géante, il stocke de grandes quantités d'eau pour traverser la saison sèche. Sur l'allée des Baobabs, près de Morondava, certains géants dépassent vingt-cinq mètres et auraient plusieurs siècles.\n\nMais ces arbres sont fragiles. Leurs jeunes plants résistent mal aux feux, au pâturage et au défrichement. Autour d'eux vit tout un réseau : chauves-souris, lémuriens et insectes qui visitent leurs fleurs la nuit.\n\nProtéger un baobab, c'est donc protéger une chaîne de vie entière. La prochaine fois que vous verrez cette silhouette à l'envers, souvenez-vous qu'elle raconte une histoire de patience.\n\nAbonnez-vous pour découvrir chaque semaine un trésor végétal de Madagascar.";
+const CALIB = "Bonjour à tous. Aujourd'hui, je vous emmène découvrir une plante étonnante. Elle pousse au bord des rivières, elle résiste à la sécheresse et ses fibres servent depuis des générations à tresser des paniers solides. Restez jusqu'à la fin, je vous montre comment la reconnaître en moins de trente secondes.";
+const DURS = [60,90,120,180,300];
+const PAR1 = new Set(['euh','heu','euhm','hum','ben','bah','bon','genre','voila','bref','quoi']);
+const PAR2 = [['du','coup'],['en','fait'],['tu','vois'],['tu','sais'],['en','gros']];
+
+const S = {
+  dur: store.get('dur', 60), libre: store.get('libre', false),
+  wpm: store.get('wpm', 150), mode: store.get('mode', 'voice'),
+  pfs: store.get('pfs', 0), mirror: false
+};
+if (S.dur < 60) S.dur = 60;
+
+const LEVELS = [
+  {n:1, name:'Fluidité', dur:60, wpm:130, focus:'Phrases courtes et mots courants. Objectif : lire sans hésiter et tenir 1:00.'},
+  {n:2, name:'Liaisons', dur:60, wpm:145, focus:'Liaisons et enchaînements (les‿enfants, ils‿ont, c\'est‿un). Objectif : un discours lié, sans hachures.'},
+  {n:3, name:'Sons difficiles', dur:90, wpm:150, focus:'Voyelles nasales (an, on, in), u et ou, r, e muet. Objectif : des voyelles nettes sur 1:30.'},
+  {n:4, name:'Virelangues', dur:120, wpm:155, focus:'Allitérations et virelangues glissés dans le discours. Objectif : garder la vitesse sans perdre de mots.'},
+  {n:5, name:'Rhétorique', dur:180, wpm:160, focus:'Anaphores, questions oratoires, chute forte. Objectif : convaincre en 3:00.'}
+];
+const THEMES = ['nature et biodiversité','sciences du quotidien','histoire','géographie et voyages','cuisine du monde','technologie','art et musique','sport et santé','économie du quotidien','langue française','astronomie','grandes inventions','environnement','psychologie et habitudes'];
+S.level = Math.min(5, Math.max(1, store.get('level', 1)));
+S.levelOk = store.get('levelOk', 0);
+const LV = () => LEVELS[S.level - 1];
+
+function norm(w){
+  return w.toLowerCase().replace(/œ/g,'oe').replace(/æ/g,'ae').normalize('NFD')
+    .replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+}
+function countWords(t){ return t.split(/\s+/).map(norm).filter(Boolean).length; }
+function fmt(s){ s = Math.max(0, Math.round(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+function fmt2(s){ s = Math.max(0, Math.floor(s)); return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+function phaseBounds(d){ const hook = Math.max(3, Math.round(d*0.05)); const out = d - Math.max(5, Math.round(d*0.15)); return {hook, out}; }
+
+/* ---------- Réglages ---------- */
+const durChips = $('#durChips');
+function renderDur(){
+  durChips.innerHTML = '';
+  DURS.forEach(d => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.textContent = fmt(d);
+    b.setAttribute('aria-pressed', String(!S.libre && S.dur === d));
+    b.onclick = () => { S.libre = false; S.dur = d; saveDur(); };
+    durChips.appendChild(b);
+  });
+  const l = document.createElement('button');
+  l.type = 'button'; l.className = 'chip'; l.textContent = 'Libre';
+  l.setAttribute('aria-pressed', String(S.libre));
+  l.onclick = () => { S.libre = true; S.dur = +$('#durRange').value || S.dur; saveDur(); };
+  durChips.appendChild(l);
+  $('#libreBox').hidden = !S.libre;
+  $('#durRange').value = S.dur; $('#durRangeVal').textContent = fmt(S.dur);
+}
+function saveDur(){ store.set('dur', S.dur); store.set('libre', S.libre); renderDur(); updateMeter(); renderPhases(); }
+$('#durRange').addEventListener('input', e => { S.dur = Math.max(60, +e.target.value); $('#durRangeVal').textContent = fmt(S.dur); store.set('dur', S.dur); updateMeter(); renderPhases(); });
+
+function renderPhases(){
+  const {hook, out} = phaseBounds(S.dur);
+  $('#phHook').style.flex = hook; $('#phBody').style.flex = out - hook; $('#phOut').style.flex = S.dur - out;
+  $('#phTimes').innerHTML = '<span>0:00</span><span>'+fmt(hook)+'</span><span>'+fmt(out)+'</span><span>'+fmt(S.dur)+'</span>';
+}
+
+const ta = $('#script');
+ta.value = store.get('script', SAMPLE);
+function updateMeter(){
+  const n = countWords(ta.value);
+  const target = Math.round(S.wpm * S.dur / 60);
+  const est = n / S.wpm * 60;
+  $('#meterTxt').textContent = n + ' / ' + target + ' mots';
+  $('#estTxt').textContent = '≈ ' + fmt(est) + ' sur ' + fmt(S.dur);
+  const max = target * 1.4;
+  $('#meterFill').style.width = Math.min(100, n / max * 100) + '%';
+  $('#meterMark').style.left = (target / max * 100) + '%';
+  const st = $('#status'); const diff = n - target; const tol = Math.max(4, Math.round(target * 0.07));
+  if (n === 0){ st.className = 'status st-warn'; st.textContent = 'Écris ou colle ton script.'; }
+  else if (Math.abs(diff) <= tol){ st.className = 'status st-ok'; st.textContent = 'Calibré pour ' + fmt(S.dur) + ' à ton débit.'; }
+  else if (diff < 0){ st.className = 'status st-warn'; st.textContent = 'Trop court : ajoute environ ' + (-diff) + ' mots, ou pose davantage de pauses.'; }
+  else {
+    const next = DURS.find(d => d > S.dur && n <= Math.round(S.wpm*d/60) + tol);
+    st.className = 'status st-bad';
+    st.textContent = 'Trop long : coupe environ ' + diff + ' mots' + (next ? ', ou passe à ' + fmt(next) + '.' : '.');
+  }
+}
+ta.addEventListener('input', () => { store.set('script', ta.value); updateMeter(); });
+$('#sample').onclick = () => { ta.value = SAMPLE; store.set('script', SAMPLE); updateMeter(); };
+
+function setWpm(v){ S.wpm = v; store.set('wpm', v); $('#wpmVal').textContent = v; updateMeter(); }
+
+/* Calibrage */
+$('#calibText').textContent = CALIB;
+let cT0 = 0, cRaf = 0;
+$('#calibToggle').onclick = () => { $('#calibBox').hidden = !$('#calibBox').hidden; };
+$('#calibGo').onclick = () => {
+  const b = $('#calibGo');
+  if (!cT0){
+    cT0 = performance.now(); b.textContent = 'Terminé';
+    const loop = () => { $('#calibClock').textContent = ((performance.now()-cT0)/1000).toFixed(1).replace('.',',') + ' s'; cRaf = requestAnimationFrame(loop); };
+    loop();
+  } else {
+    cancelAnimationFrame(cRaf);
+    const dt = (performance.now() - cT0) / 1000; cT0 = 0; b.textContent = 'Recommencer';
+    if (dt < 5){ $('#calibClock').textContent = 'Trop rapide, recommence.'; return; }
+    let w = Math.round(countWords(CALIB) / (dt/60) / 5) * 5;
+    w = Math.min(230, Math.max(80, w));
+    setWpm(w);
+    $('#calibClock').textContent = dt.toFixed(1).replace('.',',') + ' s → ' + w + ' mots/min enregistrés';
+  }
+};
+
+/* Mode */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function setMode(m){
+  S.mode = m; store.set('mode', m);
+  $('#mVoice').setAttribute('aria-pressed', String(m==='voice'));
+  $('#mConst').setAttribute('aria-pressed', String(m==='const'));
+  $('#modeNote').textContent = m === 'voice'
+    ? (SR ? 'Le texte avance quand tu prononces les mots. Les mots non reconnus sont soulignés et comptés.'
+          : 'Ce navigateur ne propose pas la reconnaissance vocale. Ouvre Verbe dans Chrome pour le suivi vocal ; la prise passera en vitesse constante.')
+    : 'Le texte avance à ' + S.wpm + ' mots/min, sans micro. Pas de score d\'articulation.';
+}
+$('#mVoice').onclick = () => setMode('voice');
+$('#mConst').onclick = () => setMode('const');
+
+/* Synthèse vocale (modèle) */
+const TTS = 'speechSynthesis' in window;
+function speak(text, btn){
+  if (!TTS) return;
+  if (speechSynthesis.speaking){ speechSynthesis.cancel(); if (btn) btn.textContent = 'Écouter le modèle'; return; }
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'fr-FR';
+  const v = speechSynthesis.getVoices().find(v => /^fr(-|_)FR/i.test(v.lang)) || speechSynthesis.getVoices().find(v => /^fr/i.test(v.lang));
+  if (v) u.voice = v;
+  u.rate = Math.min(1.4, Math.max(0.7, S.wpm / 160));
+  if (btn){ btn.textContent = 'Arrêter'; u.onend = u.onerror = () => { btn.textContent = 'Écouter le modèle'; }; }
+  speechSynthesis.speak(u);
+}
+if (!TTS) $('#listen').hidden = true;
+$('#listen').onclick = e => speak(ta.value, e.currentTarget);
+
+/* Mots à retravailler, série, historique */
+function renderRework(){
+  const m = store.get('rework', {});
+  const list = Object.entries(m).sort((a,b) => b[1]-a[1]).slice(0, 12);
+  $('#reworkCard').hidden = list.length === 0;
+  const box = $('#rework'); box.innerHTML = '';
+  list.forEach(([w,c]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'wchip';
+    b.textContent = w; const em = document.createElement('em'); em.textContent = '×'+c; b.appendChild(em);
+    b.onclick = () => speak(w);
+    box.appendChild(b);
+  });
+}
+function today(){ const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function streak(){
+  const days = new Set(store.get('days', []));
+  let n = 0; const d = new Date();
+  if (!days.has(today())) d.setDate(d.getDate()-1);
+  while (true){
+    const k = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    if (days.has(k)){ n++; d.setDate(d.getDate()-1); } else break;
+  }
+  return n;
+}
+function renderStreak(){ const n = streak(); $('#streak').innerHTML = 'Série : <b>'+n+'</b> jour'+(n>1?'s':''); }
+function renderHist(){
+  const h = store.get('hist', []);
+  $('#histCard').hidden = h.length === 0;
+  const ul = $('#hist'); ul.innerHTML = '';
+  h.slice(0,6).forEach(x => {
+    const li = document.createElement('li');
+    const a = document.createElement('span'); a.textContent = x.date + ' · cible ' + fmt(x.dur);
+    const b = document.createElement('span'); b.className = 'mono'; b.textContent = fmt(x.el);
+    const c = document.createElement('span'); c.className = 'mono'; c.textContent = x.score == null ? '—' : x.score + ' %';
+    li.append(a,b,c); ul.appendChild(li);
+  });
+}
+
+/* ---------- Plateau ---------- */
+let words = [], pointer = 0, cursor = -1, running = false, t0 = 0, raf = 0, rec = null, lastFinal = '', finals = [], heardAll = [], runMode = 'voice', wake = null, endTimer = 0;
+
+function buildStage(text){
+  const box = $('#ptext'); box.innerHTML = ''; words = [];
+  text.split(/(\s+)/).forEach(tok => {
+    if (!tok) return;
+    if (/^\s+$/.test(tok)){
+      const breaks = (tok.match(/\n/g) || []).length;
+      if (breaks >= 2){ box.appendChild(document.createElement('br')); box.appendChild(document.createElement('br')); }
+      else if (breaks === 1) box.appendChild(document.createElement('br'));
+      else box.appendChild(document.createTextNode(' '));
+      return;
+    }
+    const sp = document.createElement('span'); sp.textContent = tok;
+    const n = norm(tok);
+    if (n){
+      sp.className = 'w'; sp.dataset.i = words.length;
+      words.push({el: sp, n, txt: tok, st: 'todo'});
+    }
+    box.appendChild(sp);
+  });
+}
+function lev(a,b){
+  if (Math.abs(a.length-b.length) > 1) return 2;
+  const m = a.length, n = b.length; let prev = Array.from({length:n+1}, (_,j) => j);
+  for (let i=1;i<=m;i++){ const cur=[i]; for (let j=1;j<=n;j++){ cur[j] = Math.min(prev[j]+1, cur[j-1]+1, prev[j-1] + (a[i-1]===b[j-1]?0:1)); } prev = cur; }
+  return prev[n];
+}
+function match(t, w){
+  if (t === w) return true;
+  if (Math.min(t.length, w.length) >= 5 && lev(t,w) <= 1) return true;
+  if (t.length >= 4 && w.length >= 4 && (t.startsWith(w) || w.startsWith(t)) && Math.abs(t.length-w.length) <= 2) return true;
+  return false;
+}
+function align(tokens, start){
+  let p = start; const said = [], skipped = [];
+  for (const t of tokens){
+    const win = t.length <= 3 ? 3 : 7;
+    for (let j = p; j < Math.min(words.length, p + win); j++){
+      if (match(t, words[j].n)){
+        for (let k = p; k < j; k++) skipped.push(k);
+        said.push(j); p = j + 1; break;
+      }
+    }
+  }
+  return {p, said, skipped};
+}
+function setCursor(i){
+  i = Math.min(i, words.length - 1);
+  if (i === cursor || i < 0) return;
+  if (cursor >= 0 && words[cursor]) words[cursor].el.classList.remove('cur');
+  for (let k = Math.max(0, cursor); k < i; k++) if (words[k].st === 'todo') words[k].el.classList.add('passed');
+  cursor = i;
+  const w = words[i]; w.el.classList.add('cur');
+  const sc = $('#scroller');
+  sc.scrollTop = Math.max(0, w.el.offsetTop - sc.clientHeight * 0.32);
+}
+function mark(r){
+  r.skipped.forEach(k => { if (words[k].st === 'todo'){ words[k].st = 'skip'; words[k].el.classList.remove('passed'); words[k].el.classList.add('skip'); } });
+  r.said.forEach(k => { words[k].st = 'said'; words[k].el.classList.remove('passed','skip'); words[k].el.classList.add('said'); });
+  pointer = r.p;
+}
+const U = ['zero','un','deux','trois','quatre','cinq','six','sept','huit','neuf','dix','onze','douze','treize','quatorze','quinze','seize','dixsept','dixhuit','dixneuf'];
+const T = {2:'vingt',3:'trente',4:'quarante',5:'cinquante',6:'soixante',8:'quatrevingt'};
+function num2fr(n){ // chiffres reconnus → mots, pour comparer avec un script écrit en lettres
+  if (n < 20) return [U[n]];
+  if (n === 100) return ['cent']; if (n === 1000) return ['mille'];
+  if (n > 99) return [String(n)];
+  let t = Math.floor(n/10), u = n % 10;
+  if (t === 7 || t === 9){ t -= 1; u += 10; }
+  const base = T[t] || 'quatrevingt';
+  if (u === 0) return [t === 8 ? 'quatrevingts' : base];
+  if ((u === 1 || u === 11) && t !== 8) return [base, 'et', U[u]];
+  return [base + U[u]];
+}
+function tokensOf(txt){
+  const out = [];
+  txt.split(/\s+/).forEach(raw => { const n = norm(raw); if (!n) return; if (/^\d+$/.test(n)) out.push(...num2fr(+n)); else out.push(n); });
+  return out;
+}
+function commitFinal(txt){
+  let t = txt.trim();
+  if (lastFinal && t.toLowerCase().startsWith(lastFinal.toLowerCase())) t = t.slice(lastFinal.length).trim(); // résultats cumulés (Chrome Android)
+  lastFinal = txt.trim();
+  if (!t) return;
+  finals.push(t);
+  const tk = tokensOf(t); heardAll.push(...tk);
+  mark(align(tk, pointer));
+  setCursor(pointer);
+  if (pointer >= words.length && !endTimer) endTimer = setTimeout(stop, 1500);
+}
+function previewInterim(txt){
+  $('#heard').textContent = txt ? '« ' + txt.trim() + ' »' : '';
+  if (!txt) return;
+  const r = align(tokensOf(txt), pointer);
+  setCursor(Math.max(pointer, r.p));
+}
+
+function showBanner(msg){ const b = $('#banner'); b.textContent = msg; b.hidden = !msg; }
+function startRec(){
+  if (!SR){ runMode = 'const'; showBanner('Reconnaissance vocale absente de ce navigateur : vitesse constante à ' + S.wpm + ' mots/min.'); return; }
+  rec = new SR(); rec.lang = 'fr-FR'; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
+  rec.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++){
+      const r = e.results[i];
+      if (r.isFinal) commitFinal(r[0].transcript); else interim += r[0].transcript + ' ';
+    }
+    previewInterim(interim);
+  };
+  rec.onerror = e => {
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'audio-capture'){
+      runMode = 'const'; rec = null;
+      showBanner('Micro inaccessible ici. Le suivi vocal fonctionne quand Verbe est ouvert dans Chrome à une adresse https. Passage en vitesse constante.');
+    } else if (e.error === 'network'){
+      showBanner('Service de reconnaissance injoignable (connexion ?). Le chrono continue.');
+    }
+  };
+  rec.onend = () => { lastFinal = ''; if (running && runMode === 'voice' && rec){ try { rec.start(); } catch(err){} } };
+  try { rec.start(); } catch(err){ runMode = 'const'; showBanner('Impossible de démarrer le micro : vitesse constante.'); }
+}
+
+function tick(){
+  const el = (performance.now() - t0) / 1000;
+  const over = el > S.dur;
+  $('#tcTxt').textContent = (over ? '+' + fmt2(el - S.dur) : fmt2(el)) + ' / ' + fmt2(S.dur);
+  $('#tc').classList.toggle('over', over);
+  $('#sFill').style.width = Math.min(100, el / S.dur * 100) + '%';
+  const {hook, out} = phaseBounds(S.dur);
+  $('#phaseL').textContent = over ? 'Temps dépassé' : el < hook ? 'Accroche' : el < out ? 'Développement' : 'Chute + appel à l\'action';
+  if (runMode === 'const'){
+    const i = Math.floor(el / 60 * S.wpm);
+    if (i < words.length) setCursor(i);
+  }
+  raf = requestAnimationFrame(tick);
+}
+
+async function launch(){
+  const text = ta.value.trim();
+  if (!countWords(text)){ updateMeter(); ta.focus(); return; }
+  if (TTS) speechSynthesis.cancel();
+  buildStage(text);
+  pointer = 0; cursor = -1; finals = []; heardAll = []; lastFinal = ''; endTimer = 0;
+  runMode = S.mode; showBanner(''); $('#heard').textContent = '';
+  const {hook, out} = phaseBounds(S.dur);
+  $('#sHook').style.left = (hook / S.dur * 100) + '%'; $('#sOut').style.left = (out / S.dur * 100) + '%';
+  $('#sFill').style.width = '0%'; $('#tcTxt').textContent = '00:00 / ' + fmt2(S.dur); $('#phaseL').textContent = 'Prêt';
+  $('#ptext').classList.toggle('mirror', S.mirror);
+  if (S.pfs) document.documentElement.style.setProperty('--pfs', S.pfs + 'px');
+  $('#vSetup').hidden = true; $('#vReport').hidden = true; $('#vStage').hidden = false;
+  $('#scroller').scrollTop = 0;
+  try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch(e){ wake = null; }
+  const c = $('#count'); c.hidden = false;
+  for (const n of [3,2,1]){ c.textContent = n; await new Promise(r => setTimeout(r, 800)); }
+  c.hidden = true;
+  running = true; t0 = performance.now();
+  setCursor(0);
+  if (runMode === 'voice') startRec();
+  raf = requestAnimationFrame(tick);
+}
+
+function stop(){
+  if (!running) return;
+  running = false; cancelAnimationFrame(raf); clearTimeout(endTimer);
+  const el = (performance.now() - t0) / 1000;
+  if (rec){ try { rec.onend = null; rec.stop(); } catch(e){} rec = null; }
+  try { if (wake) wake.release(); } catch(e){} wake = null;
+  report(el);
+}
+
+/* ---------- Bilan ---------- */
+function countParasites(tk){
+  let n = 0;
+  for (let i = 0; i < tk.length; i++){
+    if (PAR1.has(tk[i])) n++;
+    for (const [a,b] of PAR2) if (tk[i] === a && tk[i+1] === b) n++;
+  }
+  return n;
+}
+function report(el){
+  const total = words.length;
+  const said = words.filter(w => w.st === 'said').length;
+  const skip = words.filter(w => w.st === 'skip');
+  const voice = runMode === 'voice';
+  const score = voice ? Math.round(100 * said / Math.max(1,total)) : null;
+  const realWpm = voice && heardAll.length ? Math.round(heardAll.length / (el / 60)) : null;
+  const par = voice ? countParasites(heardAll) : null;
+  const delta = el - S.dur;
+
+  $('#rScore').textContent = voice ? score + ' %' : '—';
+  $('#rScoreL').textContent = voice ? 'des mots du script reconnus (' + said + ' / ' + total + ')' : 'mode vitesse constante : pas de mesure d\'articulation';
+  $('#rTime').textContent = fmt(el);
+  $('#rTimeK').textContent = 'durée réelle · cible ' + fmt(S.dur) + ' (' + (delta >= 0 ? '+' : '−') + Math.abs(Math.round(delta)) + ' s)';
+  $('#rWpm').textContent = realWpm ?? '—';
+  $('#rSkip').textContent = voice ? skip.length : '—';
+  $('#rPar').textContent = par ?? '—';
+
+  const fb = [];
+  const rate = realWpm || S.wpm;
+  const L = LV();
+  if (voice){
+    const valid = score >= 90 && Math.abs(delta) <= 3 && S.dur >= L.dur;
+    if (valid){
+      S.levelOk++;
+      if (S.levelOk >= 3 && S.level < 5){
+        S.level++; S.levelOk = 0;
+        const N = LV(); S.dur = N.dur; S.libre = !DURS.includes(N.dur);
+        store.set('dur', S.dur); store.set('libre', S.libre);
+        fb.push(['ok','Niveau','Niveau ' + N.n + ' débloqué : ' + N.name + '. ' + N.focus]);
+      } else if (S.level === 5 && S.levelOk >= 3){
+        fb.push(['ok','Niveau','Niveau maximal validé. Garde la série avec un script du jour.']);
+      } else {
+        fb.push(['ok','Niveau','Prise validée : ' + S.levelOk + ' / 3 pour passer au niveau suivant.']);
+      }
+      store.set('level', S.level); store.set('levelOk', S.levelOk);
+    } else {
+      fb.push(['ex','Niveau','Pour valider la prise : 90 % de mots reconnus, timing à ±3 s' + (S.dur < L.dur ? ' et une durée d\'au moins ' + fmt(L.dur) : '') + '.']);
+    }
+  }
+  if (Math.abs(delta) <= 3) fb.push(['ok','Force','Timing tenu à ' + Math.abs(Math.round(delta)) + ' s près sur ' + fmt(S.dur) + '.']);
+  else if (delta > 0) fb.push(['bad','Défaut','Tu dépasses de ' + Math.round(delta) + ' s. Coupe environ ' + Math.round(delta/60*rate) + ' mots ou resserre les transitions.']);
+  else fb.push(['bad','Défaut','Il reste ' + Math.round(-delta) + ' s. Ajoute environ ' + Math.round(-delta/60*rate) + ' mots ou marque des pauses après tes phrases clés.']);
+  if (voice){
+    if (score >= 90) fb.push(['ok','Force','Diction nette : ' + score + ' % des mots reconnus.']);
+    else fb.push(['bad','Défaut', skip.length + ' mots n\'ont pas été reconnus, souvent les fins de mots ou les liaisons.']);
+    if (realWpm && realWpm > 175) fb.push(['bad','Défaut','Débit rapide (' + realWpm + ' mots/min). Vise 140 à 160 pour un Short clair.']);
+    else if (realWpm && realWpm < 115) fb.push(['bad','Défaut','Débit lent (' + realWpm + ' mots/min). Raccourcis les silences entre les phrases.']);
+    if (par > 2) fb.push(['bad','Défaut', par + ' mots parasites entendus. Remplace-les par un silence d\'une demi-seconde.']);
+    fb.push(['ex','Exercice', skip.length
+      ? 'Écoute puis répète chaque mot manqué trois fois en exagérant les consonnes finales, puis refais la prise.'
+      : 'Relance la prise avec un débit 10 % plus rapide sans perdre de mots.']);
+  } else {
+    fb.push(['ex','Exercice','Passe en suivi vocal pour mesurer ton articulation mot par mot.']);
+  }
+  const ul = $('#fb'); ul.innerHTML = '';
+  fb.forEach(([c,k,t]) => { const li = document.createElement('li'); const a = document.createElement('span'); a.className = 'f-'+c; a.textContent = k; const b = document.createElement('span'); b.textContent = t; li.append(a,b); ul.appendChild(li); });
+
+  const missBox = $('#rMiss'); missBox.innerHTML = '';
+  const uniq = [...new Map(skip.map(w => [w.n, w.txt.replace(/^[«"'(\[]+|[»"'.,;:!?)\]…]+$/g,'')])).values()].slice(0, 20);
+  $('#rMissCard').hidden = !voice || uniq.length === 0;
+  uniq.forEach(w => { const b = document.createElement('button'); b.type = 'button'; b.className = 'wchip'; b.textContent = w; b.onclick = () => speak(w); missBox.appendChild(b); });
+  $('#rTrans').textContent = finals.join(' ') || (voice ? 'Rien n\'a été entendu.' : 'Micro non utilisé.');
+
+  if (voice){
+    const m = store.get('rework', {});
+    uniq.forEach(w => { const k = w.toLowerCase(); m[k] = (m[k] || 0) + 1; });
+    words.filter(w => w.st === 'said').forEach(w => { const k = w.txt.replace(/^[«"'(\[]+|[»"'.,;:!?)\]…]+$/g,'').toLowerCase(); if (m[k]){ m[k]--; if (m[k] <= 0) delete m[k]; } });
+    store.set('rework', m);
+  }
+  const days = new Set(store.get('days', [])); days.add(today()); store.set('days', [...days].slice(-120));
+  const h = store.get('hist', []);
+  h.unshift({date: new Date().toLocaleDateString('fr-FR', {day:'2-digit', month:'short'}), dur: S.dur, el: Math.round(el), score});
+  store.set('hist', h.slice(0, 20));
+
+  $('#vStage').hidden = true; $('#vReport').hidden = false; window.scrollTo(0,0);
+  renderRework(); renderStreak(); renderHist(); renderLevel(); renderDur(); renderPhases(); updateMeter(); refreshDaily();
+}
+
+/* ---------- Niveaux ---------- */
+function renderLevel(){
+  const L = LV();
+  $('#lvlName').innerHTML = 'Niveau ' + L.n + ' · <span></span>'; $('#lvlName span').textContent = L.name;
+  $('#lvlFocus').textContent = L.focus + ' Durée de référence : ' + fmt(L.dur) + '.';
+  $('#ladder').innerHTML = LEVELS.map(x => '<span class="' + (x.n <= L.n ? 'on' : '') + '"></span>').join('');
+  $('#lvlDots').innerHTML = [0,1,2].map(i => '<i class="' + (i < S.levelOk ? 'on' : '') + '"></i>').join('');
+  $('#lvlProg').textContent = S.levelOk + ' / 3 prises validées' + (L.n < 5 ? ' pour le niveau ' + (L.n + 1) : '');
+  const sel = $('#lvlSel');
+  if (!sel.options.length) LEVELS.forEach(x => { const o = document.createElement('option'); o.value = x.n; o.textContent = 'Niveau ' + x.n + ' · ' + x.name; sel.appendChild(o); });
+  sel.value = String(L.n);
+}
+$('#lvlSel').addEventListener('change', e => {
+  S.level = +e.target.value; S.levelOk = 0; store.set('level', S.level); store.set('levelOk', 0);
+  const L = LV(); S.dur = L.dur; S.libre = !DURS.includes(L.dur); saveDur(); renderLevel(); refreshDaily();
+});
+
+/* ---------- Script du jour ---------- */
+let daily = null, sampleFn = null, genCtl = null;
+function applyScript(d){
+  ta.value = d.texte; store.set('script', d.texte); updateMeter();
+  $('#dailyInfo').textContent = 'Chargé dans le script. ' + countWords(d.texte) + ' mots.';
+}
+function showDaily(d, origin){
+  const t = $('#dailyTitle'); t.hidden = !d;
+  if (!d) return;
+  t.textContent = d.titre || 'Script du jour';
+  $('#dailyInfo').textContent = (d.theme ? d.theme + ' · ' : '') + countWords(d.texte) + ' mots · ' + origin;
+  $('#dailyLoad').hidden = false;
+  $('#dailyLoad').onclick = () => applyScript(d);
+}
+async function refreshDaily(){
+  $('#dailyLoad').hidden = true;
+  const cached = store.get('gen.' + today() + '.' + S.level, null);
+  let d = null, origin = '';
+  if (daily && daily.levels && daily.levels[S.level]){
+    d = daily.levels[S.level]; if (!d.theme) d.theme = daily.theme;
+    origin = daily.date === today() ? 'publié ce matin' : 'publié le ' + daily.date;
+  }
+  if (cached){ d = cached; origin = 'généré aujourd\'hui avec Claude'; }
+  if (d) showDaily(d, origin);
+  else {
+    $('#dailyTitle').hidden = true;
+    $('#dailyInfo').textContent = sampleFn ? 'Pas encore de script aujourd\'hui pour ce niveau. Génère-le avec Claude.' : 'Aucun script du jour disponible ici. Le script d\'exemple reste utilisable.';
+  }
+  $('#dailyGen').textContent = cached ? 'En générer un autre' : 'Générer avec Claude';
+}
+function dayIndex(){ const d = new Date(); return Math.floor((d - new Date(d.getFullYear(),0,0)) / 864e5); }
+async function generate(){
+  if (!sampleFn) return;
+  const L = LV();
+  const dur = Math.max(S.dur, 60);
+  const target = Math.round(S.wpm * dur / 60), lo = Math.round(target * 0.93), hi = Math.round(target * 1.05);
+  const again = !!store.get('gen.' + today() + '.' + S.level, null);
+  const theme = THEMES[(dayIndex() + S.level + (again ? Math.floor(Math.random()*THEMES.length) : 0)) % THEMES.length];
+  const rw = Object.entries(store.get('rework', {})).sort((a,b) => b[1]-a[1]).slice(0, 5).map(x => x[0]);
+  const prompt = [
+    'Tu es coach d\'éloquence et de diction française. Écris le script d\'une vidéo courte que l\'orateur lira face caméra, en français.',
+    'Niveau ' + L.n + ' sur 5, ' + L.name + ' : ' + L.focus,
+    'Thème : ' + theme + '. Choisis un sujet précis et concret dans ce thème ; n\'avance que des faits exacts et bien établis.',
+    'Longueur : entre ' + lo + ' et ' + hi + ' mots (cible ' + target + '), pour ' + fmt(dur) + ' à ' + S.wpm + ' mots par minute. Compte les mots.',
+    'Structure : accroche dans la première phrase, développement, puis chute avec un appel à l\'action.',
+    rw.length ? 'Glisse naturellement ces mots que l\'orateur doit retravailler : ' + rw.join(', ') + '.' : '',
+    'Écris les nombres en toutes lettres. Sépare les paragraphes par une ligne vide. Pas de titre dans le texte, pas d\'indication scénique, pas d\'emoji.',
+    'Réponds uniquement avec un objet JSON : {"titre": "titre court", "theme": "' + theme + '", "texte": "le script"}'
+  ].filter(Boolean).join('\n');
+  genCtl = new AbortController();
+  $('#dailyGen').disabled = true; $('#dailyStop').hidden = false;
+  $('#dailyInfo').textContent = 'Claude écrit le script du niveau ' + L.n + '…';
+  try {
+    const r = await sampleFn.json(prompt, {signal: genCtl.signal, cache: false});
+    if (!r || typeof r.texte !== 'string' || !r.texte.trim()) throw {code:'invalid_json'};
+    const d = {titre: String(r.titre || 'Script du jour'), theme: String(r.theme || theme), texte: r.texte.trim()};
+    store.set('gen.' + today() + '.' + S.level, d);
+    showDaily(d, 'généré aujourd\'hui avec Claude');
+    applyScript(d);
+    $('#dailyGen').textContent = 'En générer un autre';
+  } catch(e){
+    const c = e && e.code;
+    if (c === 'not_granted' || c === 'sampling_disabled' || c === 'not_declared' || c === 'capability_disabled' || c === 'capability_removed'){
+      $('#dailyGen').hidden = true; $('#dailyInfo').textContent = 'La génération avec Claude n\'est pas autorisée dans cette vue.';
+    } else if (c === 'cancelled'){ refreshDaily(); }
+    else if (c === 'rate_limited'){ $('#dailyInfo').textContent = 'Trop de demandes pour l\'instant. Réessaie dans quelques minutes.'; }
+    else { $('#dailyInfo').textContent = 'La génération a échoué. Touche le bouton pour réessayer.'; }
+  } finally {
+    $('#dailyGen').disabled = false; $('#dailyStop').hidden = true; genCtl = null;
+  }
+}
+$('#dailyGen').onclick = generate;
+$('#dailyStop').onclick = () => { if (genCtl) genCtl.abort(); };
+async function initDaily(){
+  try {
+    const r = await fetch('daily.json?t=' + Date.now(), {cache: 'no-store'});
+    if (r.ok){ const j = await r.json(); if (j && j.levels){ daily = j; refreshDaily(); } }
+  } catch(e){}
+  try {
+    if (window.claude && typeof window.claude.use === 'function'){
+      sampleFn = await window.claude.use('sample');
+      if (sampleFn) $('#dailyGen').hidden = false;
+    }
+  } catch(e){ sampleFn = null; }
+  refreshDaily();
+}
+
+/* ---------- Commandes ---------- */
+$('#go').onclick = launch;
+$('#again').onclick = launch;
+$('#back').onclick = () => { $('#vReport').hidden = true; $('#vSetup').hidden = false; window.scrollTo(0,0); };
+$('#stop').onclick = stop;
+$('#mirror').onclick = () => { S.mirror = !S.mirror; $('#ptext').classList.toggle('mirror', S.mirror); };
+function fontStep(d){ const cur = S.pfs || parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pfs')) || 34; S.pfs = Math.min(64, Math.max(20, cur + d)); store.set('pfs', S.pfs); document.documentElement.style.setProperty('--pfs', S.pfs + 'px'); if (cursor >= 0){ const c = cursor; cursor = -1; setCursor(c); } }
+$('#fMinus').onclick = () => fontStep(-3);
+$('#fPlus').onclick = () => fontStep(3);
+$('#ptext').addEventListener('click', e => {
+  const sp = e.target.closest('.w'); if (!sp || !running) return;
+  const i = +sp.dataset.i;
+  if (runMode === 'voice' && i > pointer){ const sk = []; for (let k = pointer; k < i; k++) sk.push(k); mark({p: i, said: [], skipped: sk}); }
+  else if (runMode === 'voice') pointer = i;
+  setCursor(i);
+});
+document.addEventListener('keydown', e => { if (!running) return; if (e.key === 'Escape') stop(); });
+if (TTS && speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = () => {};
+
+renderDur(); renderPhases(); setWpm(S.wpm); setMode(S.mode); renderRework(); renderStreak(); renderHist(); renderLevel(); initDaily();
+})();
+</script>
